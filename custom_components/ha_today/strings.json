@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure HA Today",
+        "description": "Set up the daily story generator for your home.",
+        "data": {
+          "agent_id": "Conversation Agent",
+          "base_prompt": "Base Prompt Template",
+          "update_interval": "Update Interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Selected conversation agent is not available",
+      "invalid_interval": "Update interval must be a positive number"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure HA Today",
+        "description": "Update the story generator settings.",
+        "data": {
+          "agent_id": "Conversation Agent",
+          "base_prompt": "Base Prompt Template",
+          "update_interval": "Update Interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Selected conversation agent is not available",
+      "invalid_interval": "Update interval must be a positive number"
+    }
+  },
+  "services": {
+    "commit_event": {
+      "name": "Commit Event",
+      "description": "Add an event to today's story buffer.",
+      "fields": {
+        "event": {
+          "name": "Event",
+          "description": "Description of the event that occurred."
+        },
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "Optional entity ID related to this event."
+        },
+        "metadata": {
+          "name": "Metadata",
+          "description": "Optional additional metadata about the event."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+# Example Lovelace Cards for HA Today
+# Copy these into your dashboard configuration
+
+# Basic Story Display
+- type: markdown
+  title: "Today's Story"
+  content: |
+    {{ state_attr('sensor.ha_today_story', 'story_text') or 'No story yet today...' }}
+
+    ---
+    📖 **{{ state_attr('sensor.ha_today_story', 'segment_count') }}** segments
+    ⏳ **{{ state_attr('sensor.ha_today_story', 'events_count') }}** pending events
+
+# Story with Metadata
+- type: markdown
+  title: "Home Story"
+  content: |
+    ## Today
+    {{ state_attr('sensor.ha_today_story', 'story_text') or '_No story yet today_' }}
+
+    {% if state_attr('sensor.ha_today_story', 'segment_count') > 0 %}
+    **Latest Update**: {{ as_timestamp(states('sensor.ha_today_last_updated')) | timestamp_custom('%I:%M %p') }}
+    {% endif %}
+
+    ## Yesterday
+    {{ state_attr('sensor.ha_today_yesterday', 'story_text') or '_No story from yesterday_' }}
+
+# Compact Story Widget
+- type: markdown
+  title: "📖 Story"
+  content: |
+    {% set last_segment = state_attr('sensor.ha_today_story', 'last_segment') %}
+    {% if last_segment %}
+    ### Latest
+    {{ last_segment }}
+
+    _{{ state_attr('sensor.ha_today_story', 'segment_count') }} segments today_
+    {% else %}
+    _Waiting for today's first story segment..._
+    {% endif %}
+
+# Story Statistics
+- type: entities
+  title: "Story Status"
+  entities:
+    - entity: sensor.ha_today_story
+      name: "Today's Progress"
+    - entity: sensor.ha_today_yesterday
+      name: "Yesterday"
+    - entity: sensor.ha_today_last_updated
+      name: "Last Update"
+
+# Full Dashboard Card with Statistics
+- type: vertical-stack
+  cards:
+    - type: markdown
+      title: "🏠 Daily Home Story"
+      content: |
+        {{ state_attr('sensor.ha_today_story', 'story_text') or '✨ _The story begins soon..._' }}
+
+    - type: horizontal-stack
+      cards:
+        - type: statistic
+          entity: sensor.ha_today_story
+          name: "Segments Today"
+          stat_type: state
+
+        - type: statistic
+          entity: sensor.ha_today_story
+          name: "Pending Events"
+          attribute: events_count
+          stat_type: change
+
+        - type: entity
+          entity: sensor.ha_today_last_updated
+          name: "Last Update"
+
+# Yesterday's Archive Card
+- type: markdown
+  title: "📚 Yesterday's Story"
+  content: |
+    {% set yesterday = state_attr('sensor.ha_today_yesterday', 'story_text') %}
+    {% if yesterday %}
+    {{ yesterday }}
+    {% else %}
+    _No story recorded for yesterday._
+
+    Stories are automatically saved at midnight.
+    {% endif %}
+
+# Combined Today + Yesterday View
+- type: markdown
+  title: "Home Chronicles"
+  content: |
+    ## {{ now().strftime('%A, %B %d') }}
+
+    {{ state_attr('sensor.ha_today_story', 'story_text') or '_The day\'s story is being written..._' }}
+
+    {% if state_attr('sensor.ha_today_story', 'events_count') > 0 %}
+    📝 **{{ state_attr('sensor.ha_today_story', 'events_count') }}** events waiting to be added
+    {% endif %}
+
+    ---
+
+    ## Yesterday
+
+    {{ state_attr('sensor.ha_today_yesterday', 'story_text') or '_No story from yesterday_' }}
+
+# Minimal Widget (for tablets/wall displays)
+- type: markdown
+  content: |
+    ## Today's Story
+    {{ state_attr('sensor.ha_today_story', 'last_segment') or state_attr('sensor.ha_today_story', 'story_text') or '...' }}
+
+# Event Counter Only
+- type: gauge
+  entity: sensor.ha_today_story
+  name: "Pending Events"
+  attribute: events_count
+  min: 0
+  max: 20
+  severity:
+    green: 0
+    yellow: 10
+    red: 15
+
+# Button to Test Service
+- type: button
+  name: "Add Test Event"
+  icon: mdi:book-plus
+  tap_action:
+    action: call-service
+    service: ha_today.commit_event
+    service_data:
+      event: "Manual test event added"
+
+# Story Preview (shows only latest segment)
+- type: markdown
+  title: "Latest Chapter"
+  content: |
+    {% set segment = state_attr('sensor.ha_today_story', 'last_segment') %}
+    {% if segment %}
+    {{ segment }}
+
+    _Updated {{ relative_time(states.sensor.ha_today_last_updated.state) }}_
+    {% else %}
+    _No segments yet today. Events are being collected..._
+    {% endif %}

@@ -1,0 +1,206 @@
+# Example Automations for HA Today
+# Add these to your automations.yaml or create via the UI
+
+# Motion Detection Events
+- id: ha_today_motion
+  alias: "Story: Motion Detected"
+  description: "Log motion detection events to daily story"
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.living_room_motion
+        - binary_sensor.bedroom_motion
+        - binary_sensor.kitchen_motion
+      to: "on"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Motion detected in {{ trigger.to_state.name }}"
+        entity_id: "{{ trigger.entity_id }}"
+        metadata:
+          area: "{{ area_name(trigger.entity_id) }}"
+
+# Door and Window Events
+- id: ha_today_doors
+  alias: "Story: Doors and Windows"
+  description: "Track door and window openings"
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.front_door
+        - binary_sensor.back_door
+        - binary_sensor.bedroom_window
+      to: "on"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "{{ trigger.to_state.name }} was opened"
+        entity_id: "{{ trigger.entity_id }}"
+
+# Climate Events
+- id: ha_today_temperature
+  alias: "Story: Temperature Changes"
+  description: "Log significant temperature changes"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.living_room_temperature
+      above: 25
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Living room became quite warm at {{ states('sensor.living_room_temperature') }}°C"
+        entity_id: "{{ trigger.entity_id }}"
+        metadata:
+          temperature: "{{ states(trigger.entity_id) }}"
+          unit: "°C"
+
+# Light Usage
+- id: ha_today_lights
+  alias: "Story: Light Activity"
+  description: "Track when lights are turned on"
+  trigger:
+    - platform: state
+      entity_id:
+        - light.living_room
+        - light.bedroom
+        - light.kitchen
+      to: "on"
+  condition:
+    # Only log if lights were off for more than 5 minutes
+    - condition: template
+      value_template: "{{ (now() - trigger.from_state.last_changed).total_seconds() > 300 }}"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "{{ trigger.to_state.name }} turned on"
+        entity_id: "{{ trigger.entity_id }}"
+
+# Device Charging
+- id: ha_today_charging
+  alias: "Story: Device Charging"
+  description: "Log when devices start charging"
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.phone_is_charging
+        - binary_sensor.tablet_is_charging
+      to: "on"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "{{ trigger.to_state.name }} started charging"
+        entity_id: "{{ trigger.entity_id }}"
+        metadata:
+          battery_level: "{{ state_attr(trigger.entity_id, 'battery_level') }}"
+
+# Presence Events
+- id: ha_today_presence
+  alias: "Story: Presence Changes"
+  description: "Log when people arrive or leave"
+  trigger:
+    - platform: state
+      entity_id:
+        - person.john
+        - person.jane
+      from: "not_home"
+      to: "home"
+    - platform: state
+      entity_id:
+        - person.john
+        - person.jane
+      from: "home"
+      to: "not_home"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: >
+          {% if trigger.to_state.state == 'home' %}
+            {{ trigger.to_state.name }} arrived home
+          {% else %}
+            {{ trigger.to_state.name }} left home
+          {% endif %}
+        entity_id: "{{ trigger.entity_id }}"
+
+# Media Playback
+- id: ha_today_media
+  alias: "Story: Media Playback"
+  description: "Log when media starts playing"
+  trigger:
+    - platform: state
+      entity_id:
+        - media_player.living_room_tv
+        - media_player.bedroom_speaker
+      to: "playing"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Started playing {{ state_attr(trigger.entity_id, 'media_title') }} on {{ trigger.to_state.name }}"
+        entity_id: "{{ trigger.entity_id }}"
+        metadata:
+          media_type: "{{ state_attr(trigger.entity_id, 'media_content_type') }}"
+          media_title: "{{ state_attr(trigger.entity_id, 'media_title') }}"
+
+# Weather Events
+- id: ha_today_weather
+  alias: "Story: Weather Changes"
+  description: "Log significant weather events"
+  trigger:
+    - platform: state
+      entity_id: weather.home
+      attribute: condition
+  condition:
+    - condition: template
+      # Only log interesting weather
+      value_template: "{{ trigger.to_state.state in ['rainy', 'stormy', 'snowy', 'fog'] }}"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Weather changed to {{ trigger.to_state.state }}"
+        entity_id: "{{ trigger.entity_id }}"
+        metadata:
+          temperature: "{{ state_attr(trigger.entity_id, 'temperature') }}"
+          condition: "{{ trigger.to_state.state }}"
+
+# Morning Routine
+- id: ha_today_morning
+  alias: "Story: Morning Routine Started"
+  description: "Log the start of the morning routine"
+  trigger:
+    - platform: time
+      at: "07:00:00"
+  condition:
+    - condition: state
+      entity_id: binary_sensor.workday
+      state: "on"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Morning routine began - a new workday starts"
+
+# Night Routine
+- id: ha_today_night
+  alias: "Story: Night Routine Started"
+  description: "Log when night routine begins"
+  trigger:
+    - platform: time
+      at: "22:00:00"
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Night falls and the home prepares for rest"
+
+# Automation Triggered (Meta)
+- id: ha_today_important_automation
+  alias: "Story: Important Automation Ran"
+  description: "Log when important automations execute"
+  trigger:
+    - platform: event
+      event_type: automation_triggered
+      event_data:
+        entity_id: automation.security_alert
+  action:
+    - service: ha_today.commit_event
+      data:
+        event: "Security automation was triggered"
+        metadata:
+          automation: "{{ trigger.event.data.entity_id }}"

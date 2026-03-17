@@ -1,0 +1,22 @@
+commit_event:
+  name: Commit Event
+  description: Add an event to today's story buffer.
+  fields:
+    event:
+      description: Description of the event that occurred.
+      example: "Living room motion detected"
+      required: true
+      selector:
+        text:
+    entity_id:
+      description: Optional entity ID related to this event.
+      example: "binary_sensor.living_room_motion"
+      required: false
+      selector:
+        entity:
+    metadata:
+      description: Optional additional metadata about the event.
+      example: '{"duration": 300, "trigger": "automation"}'
+      required: false
+      selector:
+        object:
