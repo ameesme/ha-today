@@ -1,5 +1,11 @@
 # HA Today - Daily Home Story Generator
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/release/ameesme/ha-today.svg)](https://github.com/ameesme/ha-today/releases)
+[![License](https://img.shields.io/github/license/ameesme/ha-today.svg)](LICENSE)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ameesme&repository=ha-today&category=integration)
+
 A Home Assistant custom integration that generates a daily narrative story about your home by collecting events throughout the day and using an LLM to create story segments hourly.
 
 ## Features
@@ -16,12 +22,15 @@ A Home Assistant custom integration that generates a daily narrative story about
 
 ### HACS (Recommended)
 
+Click the button above to add this repository to HACS, or follow these manual steps:
+
 1. Open HACS in Home Assistant
 2. Click on "Integrations"
 3. Click the three dots menu and select "Custom repositories"
-4. Add this repository URL and select "Integration" as the category
-5. Click "Install" on the HA Today card
-6. Restart Home Assistant
+4. Add this repository URL: `https://github.com/ameesme/ha-today`
+5. Select "Integration" as the category
+6. Click "Install" on the HA Today card
+7. Restart Home Assistant
 
 ### Manual Installation
 
