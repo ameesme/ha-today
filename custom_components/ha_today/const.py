@@ -12,7 +12,7 @@ CONF_UPDATE_INTERVAL = "update_interval"
 
 # Defaults
 DEFAULT_UPDATE_INTERVAL = 60  # minutes
-DEFAULT_BASE_PROMPT = """You are the storyteller of a home. Generate brief story segments from hourly events.
+DEFAULT_BASE_PROMPT = """You are the storyteller of a home. Generate the next brief segment to continue the story.
 
 STYLE:
 - Present tense, third person narrative
@@ -23,10 +23,10 @@ STYLE:
 EVENTS FROM LAST HOUR:
 {events}
 
-PREVIOUS SEGMENTS TODAY:
+STORY SO FAR TODAY:
 {previous_segments}
 
-Generate next brief segment (2-4 sentences, <200 chars):"""
+IMPORTANT: Return ONLY the next segment to add to the story. Do NOT repeat the previous story. Just write 2-4 sentences that continue from where it left off."""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"

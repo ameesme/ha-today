@@ -140,9 +140,9 @@ class StoryCoordinator(DataUpdateCoordinator):
             # Extract segment from response
             segment = response["response"]["speech"]["plain"]["speech"]
 
-            # Append segment to today's story
+            # Append segment to today's story (concatenate with space)
             self.data.today_segments.append(segment)
-            self.data.today_story = "\n\n".join(self.data.today_segments)
+            self.data.today_story = " ".join(self.data.today_segments)
             self.data.segment_count += 1
             self.data.last_update = dt_util.now()
 
@@ -174,13 +174,11 @@ class StoryCoordinator(DataUpdateCoordinator):
             ]
         )
 
-        # Format previous segments
-        segments_text = (
-            "\n\n".join(previous_segments) if previous_segments else "None yet"
-        )
+        # Format story so far (concatenated segments)
+        story_so_far = " ".join(previous_segments) if previous_segments else "The day begins."
 
         # Fill template
-        return base_prompt.format(events=events_text, previous_segments=segments_text)
+        return base_prompt.format(events=events_text, previous_segments=story_so_far)
 
     async def _handle_midnight_rollover(self) -> None:
         """Handle transition to a new day."""

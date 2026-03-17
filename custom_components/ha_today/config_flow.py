@@ -129,7 +129,7 @@ class HAtodayConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> HAodayOptionsFlow:
         """Get the options flow for this handler."""
-        return HAodayOptionsFlow(config_entry)
+        return HAodayOptionsFlow()
 
 
 class HAodayOptionsFlow(config_entries.OptionsFlow):
