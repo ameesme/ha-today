@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_AGENT_ID,
@@ -33,7 +34,7 @@ class StoryData:
     yesterday_story: str = ""
     today_segments: list[str] = field(default_factory=list)
     pending_events: list[dict[str, Any]] = field(default_factory=list)
-    last_update: datetime = field(default_factory=datetime.now)
+    last_update: datetime = field(default_factory=dt_util.now)
     segment_count: int = 0
 
 
@@ -54,7 +55,7 @@ class StoryCoordinator(DataUpdateCoordinator):
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self.data = StoryData()
         self._cancel_interval = None
-        self._last_date = datetime.now().date()
+        self._last_date = dt_util.now().date()
 
     async def async_start(self) -> None:
         """Start the coordinator."""
@@ -80,7 +81,7 @@ class StoryCoordinator(DataUpdateCoordinator):
     async def add_event(self, event_data: dict[str, Any]) -> None:
         """Add an event to the pending buffer."""
         event = {
-            "timestamp": datetime.now(),
+            "timestamp": dt_util.now(),
             "event": event_data.get("event", ""),
             "entity_id": event_data.get("entity_id"),
             "metadata": event_data.get("metadata", {}),
@@ -97,7 +98,7 @@ class StoryCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self, *args) -> StoryData:
         """Generate next story segment (called hourly)."""
-        current_date = datetime.now().date()
+        current_date = dt_util.now().date()
 
         # Check for midnight rollover
         if current_date != self._last_date:
@@ -143,7 +144,7 @@ class StoryCoordinator(DataUpdateCoordinator):
             self.data.today_segments.append(segment)
             self.data.today_story = "\n\n".join(self.data.today_segments)
             self.data.segment_count += 1
-            self.data.last_update = datetime.now()
+            self.data.last_update = dt_util.now()
 
             # Clear pending events after successful generation
             self.data.pending_events.clear()
@@ -192,7 +193,7 @@ class StoryCoordinator(DataUpdateCoordinator):
         self.data.today_story = ""
         self.data.today_segments.clear()
         self.data.segment_count = 0
-        self.data.last_update = datetime.now()
+        self.data.last_update = dt_util.now()
 
         # Note: pending_events are NOT cleared - they carry over to the new day
         # This ensures events submitted late at night are included in next segment
@@ -230,7 +231,7 @@ class StoryCoordinator(DataUpdateCoordinator):
             self.data = StoryData()
 
         # Update last_date tracking
-        self._last_date = datetime.now().date()
+        self._last_date = dt_util.now().date()
 
     async def _persist_data(self) -> None:
         """Save story data to storage."""
