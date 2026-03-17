@@ -25,31 +25,23 @@ _LOGGER = logging.getLogger(__name__)
 
 async def _get_conversation_agents(hass: HomeAssistant) -> list[str]:
     """Get list of available conversation agents."""
-    agents = []
+    try:
+        from homeassistant.components.conversation import (
+            agent_manager,
+        )
 
-    # Get conversation agents from the conversation integration
-    if "conversation" in hass.config.components:
-        try:
-            # Try to get agents from conversation integration
-            from homeassistant.components import conversation
+        # Get agent manager and fetch all agent IDs
+        manager = agent_manager.get_agent_manager(hass)
+        if manager:
+            agent_ids = manager.async_get_agent_ids()
+            if agent_ids:
+                return list(agent_ids)
 
-            agent_info = await conversation.async_get_agent_info(hass, None)
+    except Exception as err:
+        _LOGGER.warning("Could not fetch conversation agents: %s", err)
 
-            # Get all available agents
-            if hasattr(conversation, "async_get_conversation_agents"):
-                agent_ids = await conversation.async_get_conversation_agents(hass)
-                agents.extend(agent_ids)
-            else:
-                # Fallback: use default agent
-                agents.append("conversation.home_assistant")
-
-        except Exception as err:
-            _LOGGER.warning("Could not fetch conversation agents: %s", err)
-            agents.append("conversation.home_assistant")
-    else:
-        agents.append("conversation.home_assistant")
-
-    return agents if agents else ["conversation.home_assistant"]
+    # Fallback to default
+    return ["conversation.home_assistant"]
 
 
 class HAtodayConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
