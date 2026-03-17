@@ -1,0 +1,6 @@
+{
+  "name": "HA Today",
+  "render_readme": true,
+  "domains": ["sensor"],
+  "homeassistant": "2024.1.0"
+}
