@@ -6,7 +6,6 @@ DOMAIN = "ha_today"
 SERVICE_COMMIT_EVENT = "commit_event"
 
 # Config keys
-CONF_AGENT_ID = "agent_id"
 CONF_BASE_PROMPT = "base_prompt"
 CONF_UPDATE_INTERVAL = "update_interval"
 
@@ -19,6 +18,7 @@ STYLE:
 - Poetic but concise (2-4 sentences max)
 - Under 200 characters for receipt printer
 - Connect events into flowing narrative
+- MUST end with a period (.)
 
 EVENTS FROM LAST HOUR:
 {events}
@@ -26,7 +26,7 @@ EVENTS FROM LAST HOUR:
 STORY SO FAR TODAY:
 {previous_segments}
 
-IMPORTANT: Return ONLY the next segment to add to the story. Do NOT repeat the previous story. Just write 2-4 sentences that continue from where it left off."""
+IMPORTANT: Return ONLY the next segment to add to the story. Do NOT repeat the previous story. Just write 2-4 sentences that continue from where it left off. End with a period."""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"

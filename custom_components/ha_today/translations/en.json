@@ -3,16 +3,14 @@
     "step": {
       "user": {
         "title": "Configure HA Today",
-        "description": "Set up the daily story generator for your home.",
+        "description": "Set up the daily story generator for your home. Uses your configured AI service.",
         "data": {
-          "agent_id": "Conversation Agent",
           "base_prompt": "Base Prompt Template",
           "update_interval": "Update Interval (minutes)"
         }
       }
     },
     "error": {
-      "invalid_agent": "Selected conversation agent is not available",
       "invalid_interval": "Update interval must be a positive number"
     }
   },
@@ -22,14 +20,12 @@
         "title": "Configure HA Today",
         "description": "Update the story generator settings.",
         "data": {
-          "agent_id": "Conversation Agent",
           "base_prompt": "Base Prompt Template",
           "update_interval": "Update Interval (minutes)"
         }
       }
     },
     "error": {
-      "invalid_agent": "Selected conversation agent is not available",
       "invalid_interval": "Update interval must be a positive number"
     }
   },

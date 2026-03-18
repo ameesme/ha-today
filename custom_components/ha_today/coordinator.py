@@ -14,7 +14,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_AGENT_ID,
     CONF_BASE_PROMPT,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
@@ -120,7 +119,6 @@ class StoryCoordinator(DataUpdateCoordinator):
         try:
             # Build the prompt
             base_prompt = self.entry.data.get(CONF_BASE_PROMPT, "")
-            agent_id = self.entry.data.get(CONF_AGENT_ID)
 
             formatted_prompt = self._build_prompt(
                 base_prompt, self.data.pending_events, self.data.today_segments
@@ -128,17 +126,20 @@ class StoryCoordinator(DataUpdateCoordinator):
 
             _LOGGER.debug("Generating segment with %d events", len(self.data.pending_events))
 
-            # Call conversation API
+            # Call AI task service
             response = await self.hass.services.async_call(
-                "conversation",
-                "process",
-                {"text": formatted_prompt, "agent_id": agent_id},
+                "ai_task",
+                "generate_data",
+                {
+                    "task_name": "Generate story segment",
+                    "instructions": formatted_prompt,
+                },
                 blocking=True,
                 return_response=True,
             )
 
             # Extract segment from response
-            segment = response["response"]["speech"]["plain"]["speech"]
+            segment = response.get("text", "").strip()
 
             # Append segment to today's story (concatenate with space)
             self.data.today_segments.append(segment)
