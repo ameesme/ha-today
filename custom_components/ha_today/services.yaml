@@ -20,3 +20,7 @@ commit_event:
       required: false
       selector:
         object:
+
+generate_now:
+  name: Generate Story Now
+  description: Manually trigger story generation from pending events (for debugging).

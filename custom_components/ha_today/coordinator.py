@@ -58,6 +58,8 @@ class StoryCoordinator(DataUpdateCoordinator):
 
     async def async_start(self) -> None:
         """Start the coordinator."""
+        _LOGGER.info("Starting story coordinator...")
+
         # Load persisted data
         await self._load_persisted_data()
 
@@ -69,13 +71,23 @@ class StoryCoordinator(DataUpdateCoordinator):
             self.hass, self._async_update_data, interval
         )
 
-        _LOGGER.info("Story coordinator started with %d minute interval", interval.total_seconds() / 60)
+        _LOGGER.info(
+            "Story coordinator started - interval: %d minutes, pending events: %d, segments: %d",
+            interval.total_seconds() / 60,
+            len(self.data.pending_events),
+            self.data.segment_count,
+        )
 
     async def async_stop(self) -> None:
         """Stop the coordinator."""
         if self._cancel_interval:
             self._cancel_interval()
         await self._persist_data()
+
+    async def manual_generate(self) -> None:
+        """Manually trigger story generation."""
+        _LOGGER.info("=== Manual generation triggered ===")
+        await self._async_update_data()
 
     async def add_event(self, event_data: dict[str, Any]) -> None:
         """Add an event to the pending buffer."""
@@ -87,27 +99,37 @@ class StoryCoordinator(DataUpdateCoordinator):
         }
 
         self.data.pending_events.append(event)
-        _LOGGER.debug("Event added: %s (total pending: %d)", event["event"], len(self.data.pending_events))
+        _LOGGER.info(
+            "Event added: '%s' (entity: %s, total pending: %d)",
+            event["event"],
+            event["entity_id"] or "none",
+            len(self.data.pending_events),
+        )
 
         # Persist immediately to prevent data loss on reboot
         await self._persist_data()
+        _LOGGER.debug("Event persisted to storage")
 
         # Notify listeners that data has changed
         self.async_set_updated_data(self.data)
 
     async def _async_update_data(self, *args) -> StoryData:
         """Generate next story segment (called hourly)."""
+        _LOGGER.info("=== Story update triggered ===")
         current_date = dt_util.now().date()
 
         # Check for midnight rollover
         if current_date != self._last_date:
+            _LOGGER.info("Midnight rollover detected: %s -> %s", self._last_date, current_date)
             await self._handle_midnight_rollover()
             self._last_date = current_date
 
         # Only generate segment if we have pending events
         if not self.data.pending_events:
-            _LOGGER.debug("No pending events, skipping segment generation")
+            _LOGGER.warning("No pending events in buffer - skipping segment generation")
             return self.data
+
+        _LOGGER.info("Processing %d pending events for story generation", len(self.data.pending_events))
 
         # Generate story segment
         await self._generate_segment()
@@ -119,14 +141,21 @@ class StoryCoordinator(DataUpdateCoordinator):
         try:
             # Build the prompt
             base_prompt = self.entry.data.get(CONF_BASE_PROMPT, "")
+            _LOGGER.debug("Using base prompt: %s...", base_prompt[:100])
 
             formatted_prompt = self._build_prompt(
                 base_prompt, self.data.pending_events, self.data.today_segments
             )
 
-            _LOGGER.debug("Generating segment with %d events", len(self.data.pending_events))
+            _LOGGER.info(
+                "Generating segment %d with %d events",
+                self.data.segment_count + 1,
+                len(self.data.pending_events),
+            )
+            _LOGGER.debug("Full prompt length: %d characters", len(formatted_prompt))
 
             # Call AI task service
+            _LOGGER.debug("Calling ai_task.generate_data service...")
             response = await self.hass.services.async_call(
                 "ai_task",
                 "generate_data",
@@ -138,8 +167,16 @@ class StoryCoordinator(DataUpdateCoordinator):
                 return_response=True,
             )
 
+            _LOGGER.debug("AI service response received: %s", response)
+
             # Extract segment from response
             segment = response.get("text", "").strip()
+
+            if not segment:
+                _LOGGER.error("AI service returned empty segment!")
+                return
+
+            _LOGGER.info("Generated segment: '%s' (%d chars)", segment[:50], len(segment))
 
             # Append segment to today's story (concatenate with space)
             self.data.today_segments.append(segment)
@@ -148,15 +185,21 @@ class StoryCoordinator(DataUpdateCoordinator):
             self.data.last_update = dt_util.now()
 
             # Clear pending events after successful generation
+            events_processed = len(self.data.pending_events)
             self.data.pending_events.clear()
 
-            _LOGGER.info("Story segment generated (segment %d)", self.data.segment_count)
+            _LOGGER.info(
+                "✓ Story segment %d completed - processed %d events, story length: %d chars",
+                self.data.segment_count,
+                events_processed,
+                len(self.data.today_story),
+            )
 
             # Persist the updated state
             await self._persist_data()
 
         except Exception as err:
-            _LOGGER.error("Failed to generate story segment: %s", err)
+            _LOGGER.error("Failed to generate story segment: %s", err, exc_info=True)
             # Events remain in pending_events buffer for retry on next interval
 
     def _build_prompt(

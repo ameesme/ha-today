@@ -4,6 +4,7 @@ DOMAIN = "ha_today"
 
 # Services
 SERVICE_COMMIT_EVENT = "commit_event"
+SERVICE_GENERATE_NOW = "generate_now"
 
 # Config keys
 CONF_BASE_PROMPT = "base_prompt"

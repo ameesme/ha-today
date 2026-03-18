@@ -47,6 +47,10 @@
           "description": "Optional additional metadata about the event."
         }
       }
+    },
+    "generate_now": {
+      "name": "Generate Story Now",
+      "description": "Manually trigger story generation from pending events (for debugging)."
     }
   }
 }
