@@ -12,22 +12,26 @@ CONF_UPDATE_INTERVAL = "update_interval"
 
 # Defaults
 DEFAULT_UPDATE_INTERVAL = 60  # minutes
-DEFAULT_BASE_PROMPT = """You are the storyteller of a home. Generate the next brief segment to continue the story.
+DEFAULT_BASE_PROMPT = """Summarize what happened in the home. Be factual with subtle assumptions about daily life.
 
-STYLE:
-- Present tense, third person narrative
-- Poetic but concise (2-4 sentences max)
-- Under 200 characters for receipt printer
-- Connect events into flowing narrative
-- MUST end with a period (.)
+STYLE EXAMPLES:
+- "The front door opens, is Mees leaving? It appears so, heading to Waalre. Security on, heat off, lights off."
+- "Motion in hallway at 08:11, perhaps someone got out of bed. 78 liters used, a reasonable shower."
+- "Two people detected in studio, guests? They remain throughout the hour, probably working."
 
-EVENTS FROM LAST HOUR:
+RULES:
+- Max 200 characters
+- Factual with subtle assumptions
+- Brief rhetorical questions OK
+- No drama or poetry
+
+EVENTS:
 {events}
 
-STORY SO FAR TODAY:
+STORY SO FAR:
 {previous_segments}
 
-IMPORTANT: Return ONLY the next segment to add to the story. Do NOT repeat the previous story. Just write 2-4 sentences that continue from where it left off. End with a period."""
+Write the next short segment:"""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"
