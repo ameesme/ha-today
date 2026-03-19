@@ -173,8 +173,9 @@ class StoryCoordinator(DataUpdateCoordinator):
             # Extract segment from response - try different possible keys
             segment = None
             if isinstance(response, dict):
-                # Try common response keys
+                # Try common response keys (ai_task uses "data")
                 segment = (
+                    response.get("data") or
                     response.get("text") or
                     response.get("response") or
                     response.get("content") or
