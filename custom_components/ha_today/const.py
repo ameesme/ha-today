@@ -12,26 +12,32 @@ CONF_UPDATE_INTERVAL = "update_interval"
 
 # Defaults
 DEFAULT_UPDATE_INTERVAL = 60  # minutes
-DEFAULT_BASE_PROMPT = """Summarize what happened in the home. Be factual with subtle assumptions about daily life.
+DEFAULT_BASE_PROMPT = """You write a home activity log. Plain facts only, like a journal entry.
 
-STYLE EXAMPLES:
-- "The front door opens, is Mees leaving? It appears so, heading to Waalre. Security on, heat off, lights off."
-- "Motion in hallway at 08:11, perhaps someone got out of bed. 78 liters used, a reasonable shower."
-- "Two people detected in studio, guests? They remain throughout the hour, probably working."
+GOOD (copy this style exactly):
+- "Front door opens, Mees leaving? Heading to Waalre. Security on, heat off."
+- "Motion in hallway at 08:11, perhaps out of bed. 78 liters used, quick shower."
+- "Two in studio, guests? Probably working."
+
+BAD (never write like this):
+- "Presence stirs through rooms" - too poetic
+- "Dust motes drift" - too dramatic
+- "soft hum of appliances" - unnecessary filler
+- "weight of an empty room" - pretentious
 
 RULES:
-- Max 200 characters
-- Factual with subtle assumptions
-- Brief rhetorical questions OK
-- No drama or poetry
+- Under 150 chars
+- Plain language only
+- No poetry, no metaphors, no drama
+- Just state what happened
 
-EVENTS:
-{events}
+ROOMS: {areas}
 
-STORY SO FAR:
-{previous_segments}
+EVENTS: {events}
 
-Write the next short segment:"""
+PREVIOUS: {previous_segments}
+
+Log entry:"""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"

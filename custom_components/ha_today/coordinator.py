@@ -228,11 +228,16 @@ class StoryCoordinator(DataUpdateCoordinator):
         previous_segments: list[str],
     ) -> str:
         """Build the LLM prompt from template."""
+        # Get all areas in the home
+        from homeassistant.helpers import area_registry
+        area_reg = area_registry.async_get(self.hass)
+        areas = [area.name for area in area_reg.async_list_areas()]
+        areas_text = ", ".join(sorted(areas)) if areas else "Unknown"
+
         # Format events
         events_text = "\n".join(
             [
                 f"- {evt['timestamp'].strftime('%H:%M')}: {evt['event']}"
-                + (f" (entity: {evt['entity_id']})" if evt.get("entity_id") else "")
                 for evt in events
             ]
         )
@@ -241,7 +246,11 @@ class StoryCoordinator(DataUpdateCoordinator):
         story_so_far = " ".join(previous_segments) if previous_segments else "The day begins."
 
         # Fill template
-        return base_prompt.format(events=events_text, previous_segments=story_so_far)
+        return base_prompt.format(
+            events=events_text,
+            previous_segments=story_so_far,
+            areas=areas_text,
+        )
 
     async def _handle_midnight_rollover(self) -> None:
         """Handle transition to a new day."""
