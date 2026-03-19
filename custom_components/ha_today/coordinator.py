@@ -152,10 +152,10 @@ class StoryCoordinator(DataUpdateCoordinator):
                 self.data.segment_count + 1,
                 len(self.data.pending_events),
             )
-            _LOGGER.debug("Full prompt length: %d characters", len(formatted_prompt))
+            _LOGGER.info("=== FULL PROMPT ===\n%s\n=== END PROMPT ===", formatted_prompt)
 
             # Call AI task service
-            _LOGGER.debug("Calling ai_task.generate_data service...")
+            _LOGGER.info("Calling ai_task.generate_data service...")
             response = await self.hass.services.async_call(
                 "ai_task",
                 "generate_data",
@@ -167,13 +167,31 @@ class StoryCoordinator(DataUpdateCoordinator):
                 return_response=True,
             )
 
-            _LOGGER.debug("AI service response received: %s", response)
+            _LOGGER.info("AI service raw response: %s", response)
+            _LOGGER.info("Response type: %s, keys: %s", type(response), response.keys() if isinstance(response, dict) else "not a dict")
 
-            # Extract segment from response
-            segment = response.get("text", "").strip()
+            # Extract segment from response - try different possible keys
+            segment = None
+            if isinstance(response, dict):
+                # Try common response keys
+                segment = (
+                    response.get("text") or
+                    response.get("response") or
+                    response.get("content") or
+                    response.get("output") or
+                    response.get("result")
+                )
+            elif isinstance(response, str):
+                segment = response
+
+            if segment:
+                segment = segment.strip()
 
             if not segment:
-                _LOGGER.error("AI service returned empty segment!")
+                _LOGGER.error(
+                    "AI service returned empty segment! Response was: %s",
+                    response
+                )
                 return
 
             _LOGGER.info("Generated segment: '%s' (%d chars)", segment[:50], len(segment))
