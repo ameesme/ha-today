@@ -8,36 +8,44 @@ SERVICE_GENERATE_NOW = "generate_now"
 
 # Config keys
 CONF_BASE_PROMPT = "base_prompt"
-CONF_UPDATE_INTERVAL = "update_interval"
 
 # Defaults
-DEFAULT_UPDATE_INTERVAL = 60  # minutes
-DEFAULT_BASE_PROMPT = """You write a home activity log. Plain facts only, like a journal entry.
+DEFAULT_BASE_PROMPT = """You maintain a home activity journal. Only log NOTABLE day events.
 
-GOOD (copy this style exactly):
-- "Front door opens, Mees leaving? Heading to Waalre. Security on, heat off."
-- "Motion in hallway at 08:11, perhaps out of bed. 78 liters used, quick shower."
-- "Two in studio, guests? Probably working."
+NOTABLE (worth logging):
+- Taking a shower, water usage
+- Leaving or arriving home
+- Robot vacuum running
+- Visitors / unusual presence
+- Meal times, cooking
+- Significant routines
 
-BAD (never write like this):
-- "Presence stirs through rooms" - too poetic
-- "Dust motes drift" - too dramatic
-- "soft hum of appliances" - unnecessary filler
-- "weight of an empty room" - pretentious
+NOT NOTABLE (skip these):
+- Random motion detection
+- Lights toggling on/off
+- Walking around the house
+- Minor sensor changes
+
+STYLE (copy exactly):
+- "Front door opens, Mees leaving? Heading to Waalre. Security on."
+- "78 liters used at 08:15, morning shower. Kitchen lights on, breakfast."
+- "Robot vacuum started in living room, cleaning day."
 
 RULES:
-- Under 150 chars
-- Plain language only
-- No poetry, no metaphors, no drama
-- Just state what happened
+- Max 150 chars
+- Plain facts, subtle assumptions OK
+- No poetry, no drama
+- If nothing notable: respond with exactly NO_UPDATE
 
 ROOMS: {areas}
 
-EVENTS: {events}
+EVENTS:
+{events}
 
-PREVIOUS: {previous_segments}
+JOURNAL SO FAR:
+{previous_segments}
 
-Log entry:"""
+Your response (entry or NO_UPDATE):"""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"

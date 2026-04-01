@@ -3,54 +3,46 @@
     "step": {
       "user": {
         "title": "Configure HA Today",
-        "description": "Set up the daily story generator for your home. Uses your configured AI service.",
+        "description": "Set up the home activity journal. Generates after 5 min of silence or 30 min max wait.",
         "data": {
-          "base_prompt": "Base Prompt Template",
-          "update_interval": "Update Interval (minutes)"
+          "base_prompt": "Prompt Template"
         }
       }
-    },
-    "error": {
-      "invalid_interval": "Update interval must be a positive number"
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Configure HA Today",
-        "description": "Update the story generator settings.",
+        "description": "Update the journal settings.",
         "data": {
-          "base_prompt": "Base Prompt Template",
-          "update_interval": "Update Interval (minutes)"
+          "base_prompt": "Prompt Template"
         }
       }
-    },
-    "error": {
-      "invalid_interval": "Update interval must be a positive number"
     }
   },
   "services": {
     "commit_event": {
       "name": "Commit Event",
-      "description": "Add an event to today's story buffer.",
+      "description": "Add an event to the pending buffer.",
       "fields": {
         "event": {
           "name": "Event",
-          "description": "Description of the event that occurred."
+          "description": "Description of the event."
         },
         "entity_id": {
           "name": "Entity ID",
-          "description": "Optional entity ID related to this event."
+          "description": "Optional related entity."
         },
         "metadata": {
           "name": "Metadata",
-          "description": "Optional additional metadata about the event."
+          "description": "Optional additional data."
         }
       }
     },
     "generate_now": {
-      "name": "Generate Story Now",
-      "description": "Manually trigger story generation from pending events (for debugging)."
+      "name": "Generate Now",
+      "description": "Manually trigger generation from pending events."
     }
   }
 }

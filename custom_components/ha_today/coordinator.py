@@ -1,40 +1,46 @@
 """Story coordinator for HA Today integration."""
 from __future__ import annotations
 
+import aiosqlite
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import logging
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_BASE_PROMPT,
-    CONF_UPDATE_INTERVAL,
-    DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_BASE_PROMPT,
     DOMAIN,
-    STORAGE_KEY,
-    STORAGE_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Timing constants
+CHECK_INTERVAL_SECONDS = 60  # Check every minute
+SILENCE_THRESHOLD_MINUTES = 5  # Generate after 5 min of no events
+MAX_WAIT_MINUTES = 30  # Generate after 30 min regardless
+HISTORY_HOURS = 12  # Show last 12 hours in entity/prompt
 
 
 @dataclass
 class StoryData:
     """Data structure for story state."""
 
-    today_story: str = ""
-    yesterday_story: str = ""
-    today_segments: list[str] = field(default_factory=list)
+    # Transient (memory only)
     pending_events: list[dict[str, Any]] = field(default_factory=list)
-    last_update: datetime = field(default_factory=dt_util.now)
-    segment_count: int = 0
+    last_event_time: datetime | None = None
+    last_generation_time: datetime | None = None
+
+    # From database (last 12h)
+    recent_story: str = ""
+    story_entries: list[dict[str, Any]] = field(default_factory=list)
 
 
 class StoryCoordinator(DataUpdateCoordinator):
@@ -46,48 +52,77 @@ class StoryCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(
-                minutes=entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-            ),
+            update_interval=timedelta(seconds=CHECK_INTERVAL_SECONDS),
         )
         self.entry = entry
-        self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._db_path = Path(hass.config.path("ha_today.db"))
         self.data = StoryData()
         self._cancel_interval = None
-        self._last_date = dt_util.now().date()
 
     async def async_start(self) -> None:
         """Start the coordinator."""
         _LOGGER.info("Starting story coordinator...")
 
-        # Load persisted data
-        await self._load_persisted_data()
+        # Initialize database
+        await self._init_database()
 
-        # Set up hourly interval updates
-        interval = timedelta(
-            minutes=self.entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-        )
+        # Load recent story entries
+        await self._load_recent_entries()
+
+        # Set up check interval
         self._cancel_interval = async_track_time_interval(
-            self.hass, self._async_update_data, interval
+            self.hass, self._check_and_generate, timedelta(seconds=CHECK_INTERVAL_SECONDS)
         )
 
         _LOGGER.info(
-            "Story coordinator started - interval: %d minutes, pending events: %d, segments: %d",
-            interval.total_seconds() / 60,
-            len(self.data.pending_events),
-            self.data.segment_count,
+            "Story coordinator started - checking every %ds, silence threshold: %dm, max wait: %dm",
+            CHECK_INTERVAL_SECONDS,
+            SILENCE_THRESHOLD_MINUTES,
+            MAX_WAIT_MINUTES,
         )
 
     async def async_stop(self) -> None:
         """Stop the coordinator."""
         if self._cancel_interval:
             self._cancel_interval()
-        await self._persist_data()
+
+    async def _init_database(self) -> None:
+        """Initialize SQLite database."""
+        async with aiosqlite.connect(self._db_path) as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS story_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    content TEXT NOT NULL
+                )
+            """)
+            await db.commit()
+        _LOGGER.debug("Database initialized at %s", self._db_path)
+
+    async def _load_recent_entries(self) -> None:
+        """Load story entries from last 12 hours."""
+        cutoff = (dt_util.now() - timedelta(hours=HISTORY_HOURS)).isoformat()
+
+        async with aiosqlite.connect(self._db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT timestamp, content FROM story_entries WHERE timestamp > ? ORDER BY timestamp ASC",
+                (cutoff,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        self.data.story_entries = [
+            {"timestamp": row["timestamp"], "content": row["content"]}
+            for row in rows
+        ]
+        self.data.recent_story = " ".join(entry["content"] for entry in self.data.story_entries)
+
+        _LOGGER.info("Loaded %d story entries from last %dh", len(self.data.story_entries), HISTORY_HOURS)
 
     async def manual_generate(self) -> None:
         """Manually trigger story generation."""
         _LOGGER.info("=== Manual generation triggered ===")
-        await self._async_update_data()
+        await self._generate_segment()
 
     async def add_event(self, event_data: dict[str, Any]) -> None:
         """Add an event to the pending buffer."""
@@ -99,134 +134,122 @@ class StoryCoordinator(DataUpdateCoordinator):
         }
 
         self.data.pending_events.append(event)
+        self.data.last_event_time = event["timestamp"]
+
         _LOGGER.info(
-            "Event added: '%s' (entity: %s, total pending: %d)",
-            event["event"],
-            event["entity_id"] or "none",
+            "Event added: '%s' (total pending: %d)",
+            event["event"][:50],
             len(self.data.pending_events),
         )
-
-        # Persist immediately to prevent data loss on reboot
-        await self._persist_data()
-        _LOGGER.debug("Event persisted to storage")
 
         # Notify listeners that data has changed
         self.async_set_updated_data(self.data)
 
-    async def _async_update_data(self, *args) -> StoryData:
-        """Generate next story segment (called hourly)."""
-        _LOGGER.info("=== Story update triggered ===")
-        current_date = dt_util.now().date()
-
-        # Check for midnight rollover
-        if current_date != self._last_date:
-            _LOGGER.info("Midnight rollover detected: %s -> %s", self._last_date, current_date)
-            await self._handle_midnight_rollover()
-            self._last_date = current_date
-
-        # Only generate segment if we have pending events
+    async def _check_and_generate(self, *args) -> None:
+        """Check if we should generate and do so if conditions met."""
         if not self.data.pending_events:
-            _LOGGER.warning("No pending events in buffer - skipping segment generation")
-            return self.data
+            return  # Nothing to process
 
-        _LOGGER.info("Processing %d pending events for story generation", len(self.data.pending_events))
+        now = dt_util.now()
 
-        # Generate story segment
-        await self._generate_segment()
+        # Calculate time since last event
+        silence_duration = now - self.data.last_event_time if self.data.last_event_time else timedelta(hours=999)
+        silence_met = silence_duration >= timedelta(minutes=SILENCE_THRESHOLD_MINUTES)
 
-        return self.data
+        # Calculate time since last generation
+        if self.data.last_generation_time:
+            wait_duration = now - self.data.last_generation_time
+        else:
+            # If never generated, use time since first event
+            wait_duration = now - self.data.pending_events[0]["timestamp"]
+        max_wait_met = wait_duration >= timedelta(minutes=MAX_WAIT_MINUTES)
+
+        if silence_met or max_wait_met:
+            reason = "silence" if silence_met else "max_wait"
+            _LOGGER.info(
+                "Generation triggered (%s) - %d events, silence: %.1fm, wait: %.1fm",
+                reason,
+                len(self.data.pending_events),
+                silence_duration.total_seconds() / 60,
+                wait_duration.total_seconds() / 60,
+            )
+            await self._generate_segment()
 
     async def _generate_segment(self) -> None:
         """Generate a story segment from pending events."""
+        if not self.data.pending_events:
+            _LOGGER.warning("No pending events to process")
+            return
+
         try:
             # Build the prompt
-            base_prompt = self.entry.data.get(CONF_BASE_PROMPT, "")
-            _LOGGER.debug("Using base prompt: %s...", base_prompt[:100])
+            base_prompt = self.entry.data.get(CONF_BASE_PROMPT, DEFAULT_BASE_PROMPT)
+            formatted_prompt = self._build_prompt(base_prompt)
 
-            formatted_prompt = self._build_prompt(
-                base_prompt, self.data.pending_events, self.data.today_segments
-            )
-
-            _LOGGER.info(
-                "Generating segment %d with %d events",
-                self.data.segment_count + 1,
-                len(self.data.pending_events),
-            )
-            _LOGGER.info("=== FULL PROMPT ===\n%s\n=== END PROMPT ===", formatted_prompt)
+            _LOGGER.info("Generating with %d events", len(self.data.pending_events))
+            _LOGGER.debug("=== PROMPT ===\n%s\n=== END ===", formatted_prompt)
 
             # Call AI task service
-            _LOGGER.info("Calling ai_task.generate_data service...")
             response = await self.hass.services.async_call(
                 "ai_task",
                 "generate_data",
                 {
-                    "task_name": "Generate story segment",
+                    "task_name": "Home activity log",
                     "instructions": formatted_prompt,
                 },
                 blocking=True,
                 return_response=True,
             )
 
-            _LOGGER.info("AI service raw response: %s", response)
-            _LOGGER.info("Response type: %s, keys: %s", type(response), response.keys() if isinstance(response, dict) else "not a dict")
+            _LOGGER.debug("AI response: %s", response)
 
-            # Extract segment from response - try different possible keys
+            # Extract segment from response
             segment = None
             if isinstance(response, dict):
-                # Try common response keys (ai_task uses "data")
-                segment = (
-                    response.get("data") or
-                    response.get("text") or
-                    response.get("response") or
-                    response.get("content") or
-                    response.get("output") or
-                    response.get("result")
-                )
+                segment = response.get("data") or response.get("text")
             elif isinstance(response, str):
                 segment = response
 
             if segment:
                 segment = segment.strip()
 
-            if not segment:
-                _LOGGER.error(
-                    "AI service returned empty segment! Response was: %s",
-                    response
-                )
+            # Update generation time regardless of outcome
+            self.data.last_generation_time = dt_util.now()
+
+            # Check for NO_UPDATE response
+            if not segment or segment.upper() in ("NO_UPDATE", "NO UPDATE", "NONE", "N/A"):
+                _LOGGER.info("LLM decided: no noteworthy events")
+                self.data.pending_events.clear()
+                self.async_set_updated_data(self.data)
                 return
 
-            _LOGGER.info("Generated segment: '%s' (%d chars)", segment[:50], len(segment))
+            _LOGGER.info("Generated: '%s' (%d chars)", segment[:80], len(segment))
 
-            # Append segment to today's story (concatenate with space)
-            self.data.today_segments.append(segment)
-            self.data.today_story = " ".join(self.data.today_segments)
-            self.data.segment_count += 1
-            self.data.last_update = dt_util.now()
+            # Save to database
+            timestamp = dt_util.now().isoformat()
+            async with aiosqlite.connect(self._db_path) as db:
+                await db.execute(
+                    "INSERT INTO story_entries (timestamp, content) VALUES (?, ?)",
+                    (timestamp, segment)
+                )
+                await db.commit()
 
-            # Clear pending events after successful generation
-            events_processed = len(self.data.pending_events)
+            # Update local state
+            self.data.story_entries.append({"timestamp": timestamp, "content": segment})
+            self.data.recent_story = " ".join(entry["content"] for entry in self.data.story_entries)
+
+            # Clear pending events
             self.data.pending_events.clear()
 
-            _LOGGER.info(
-                "✓ Story segment %d completed - processed %d events, story length: %d chars",
-                self.data.segment_count,
-                events_processed,
-                len(self.data.today_story),
-            )
+            _LOGGER.info("✓ Story entry saved to database")
 
-            # Persist the updated state
-            await self._persist_data()
+            # Notify listeners
+            self.async_set_updated_data(self.data)
 
         except Exception as err:
-            _LOGGER.error("Failed to generate story segment: %s", err, exc_info=True)
-            # Events remain in pending_events buffer for retry on next interval
+            _LOGGER.error("Failed to generate: %s", err, exc_info=True)
 
-    def _build_prompt(
-        self,
-        base_prompt: str,
-        events: list[dict[str, Any]],
-        previous_segments: list[str],
-    ) -> str:
+    def _build_prompt(self, base_prompt: str) -> str:
         """Build the LLM prompt from template."""
         # Get all areas in the home
         from homeassistant.helpers import area_registry
@@ -234,16 +257,14 @@ class StoryCoordinator(DataUpdateCoordinator):
         areas = [area.name for area in area_reg.async_list_areas()]
         areas_text = ", ".join(sorted(areas)) if areas else "Unknown"
 
-        # Format events
+        # Format pending events
         events_text = "\n".join(
-            [
-                f"- {evt['timestamp'].strftime('%H:%M')}: {evt['event']}"
-                for evt in events
-            ]
+            f"- {evt['timestamp'].strftime('%H:%M')}: {evt['event']}"
+            for evt in self.data.pending_events
         )
 
-        # Format story so far (concatenated segments)
-        story_so_far = " ".join(previous_segments) if previous_segments else "The day begins."
+        # Format recent story (last 12h)
+        story_so_far = self.data.recent_story if self.data.recent_story else "No entries yet today."
 
         # Fill template
         return base_prompt.format(
@@ -251,76 +272,3 @@ class StoryCoordinator(DataUpdateCoordinator):
             previous_segments=story_so_far,
             areas=areas_text,
         )
-
-    async def _handle_midnight_rollover(self) -> None:
-        """Handle transition to a new day."""
-        _LOGGER.info("Midnight rollover: saving today's story to yesterday")
-
-        # Move today's story to yesterday
-        self.data.yesterday_story = self.data.today_story
-
-        # Reset today's story
-        self.data.today_story = ""
-        self.data.today_segments.clear()
-        self.data.segment_count = 0
-        self.data.last_update = dt_util.now()
-
-        # Note: pending_events are NOT cleared - they carry over to the new day
-        # This ensures events submitted late at night are included in next segment
-
-        await self._persist_data()
-
-    async def _load_persisted_data(self) -> None:
-        """Load story data from storage."""
-        data = await self._store.async_load()
-
-        if data:
-            # Restore pending events with datetime objects
-            pending_events = []
-            for evt in data.get("pending_events", []):
-                evt_copy = evt.copy()
-                evt_copy["timestamp"] = datetime.fromisoformat(evt["timestamp"])
-                pending_events.append(evt_copy)
-
-            self.data = StoryData(
-                today_story=data.get("today_story", ""),
-                yesterday_story=data.get("yesterday_story", ""),
-                today_segments=data.get("today_segments", []),
-                pending_events=pending_events,
-                last_update=datetime.fromisoformat(data["last_update"]),
-                segment_count=data.get("segment_count", 0),
-            )
-
-            _LOGGER.info(
-                "Loaded persisted data: %d segments, %d pending events",
-                self.data.segment_count,
-                len(self.data.pending_events),
-            )
-        else:
-            _LOGGER.info("No persisted data found, starting fresh")
-            self.data = StoryData()
-
-        # Update last_date tracking
-        self._last_date = dt_util.now().date()
-
-    async def _persist_data(self) -> None:
-        """Save story data to storage."""
-        # Convert pending events to serializable format
-        pending_events = []
-        for evt in self.data.pending_events:
-            evt_copy = evt.copy()
-            evt_copy["timestamp"] = evt["timestamp"].isoformat()
-            pending_events.append(evt_copy)
-
-        await self._store.async_save(
-            {
-                "today_story": self.data.today_story,
-                "yesterday_story": self.data.yesterday_story,
-                "today_segments": self.data.today_segments,
-                "pending_events": pending_events,
-                "last_update": self.data.last_update.isoformat(),
-                "segment_count": self.data.segment_count,
-            }
-        )
-
-        _LOGGER.debug("Story data persisted")
