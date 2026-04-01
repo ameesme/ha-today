@@ -37,6 +37,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             StorySensor(coordinator, entry),
+            PendingEventsSensor(coordinator, entry),
             LastGeneratedSensor(coordinator, entry),
         ]
     )
@@ -76,6 +77,38 @@ class StorySensor(CoordinatorEntity, SensorEntity):
             attrs[ATTR_LAST_SEGMENT] = self.coordinator.data.story_entries[-1]["content"]
 
         return attrs
+
+
+class PendingEventsSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for pending events count."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:clipboard-list"
+    _attr_state_class = "measurement"
+
+    def __init__(self, coordinator: StoryCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_pending_events"
+        self._attr_name = "Pending Events"
+
+    @property
+    def native_value(self) -> int:
+        """Return the count of pending events."""
+        return len(self.coordinator.data.pending_events)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the pending events as attributes."""
+        return {
+            "events": [
+                {
+                    "time": evt["timestamp"].strftime("%H:%M:%S"),
+                    "event": evt["event"],
+                }
+                for evt in self.coordinator.data.pending_events
+            ]
+        }
 
 
 class LastGeneratedSensor(CoordinatorEntity, SensorEntity):
