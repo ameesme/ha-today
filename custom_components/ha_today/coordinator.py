@@ -216,10 +216,9 @@ class StoryCoordinator(DataUpdateCoordinator):
             # Update generation time regardless of outcome
             self.data.last_generation_time = dt_util.now()
 
-            # Check for NO_UPDATE response
+            # Check for NO_UPDATE response - keep events for next time
             if not segment or segment.upper() in ("NO_UPDATE", "NO UPDATE", "NONE", "N/A"):
-                _LOGGER.info("LLM decided: no noteworthy events")
-                self.data.pending_events.clear()
+                _LOGGER.info("LLM decided: no noteworthy events yet - keeping %d events for next check", len(self.data.pending_events))
                 self.async_set_updated_data(self.data)
                 return
 
