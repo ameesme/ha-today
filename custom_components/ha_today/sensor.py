@@ -44,7 +44,7 @@ async def async_setup_entry(
 
 
 class StorySensor(CoordinatorEntity, SensorEntity):
-    """Sensor for the home story (last 12 hours)."""
+    """Sensor for the home story (last 24 hours)."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:book-open-variant"

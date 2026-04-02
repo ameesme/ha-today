@@ -26,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 CHECK_INTERVAL_SECONDS = 60  # Check every minute
 SILENCE_THRESHOLD_MINUTES = 5  # Generate after 5 min of no events
 MAX_WAIT_MINUTES = 30  # Generate after 30 min regardless
-HISTORY_HOURS = 12  # Show last 12 hours in entity/prompt
+HISTORY_HOURS = 24  # Show last 24 hours in entity/prompt
 
 
 @dataclass
@@ -38,7 +38,7 @@ class StoryData:
     last_event_time: datetime | None = None
     last_generation_time: datetime | None = None
 
-    # From database (last 12h)
+    # From database (last 24h)
     recent_story: str = ""
     story_entries: list[dict[str, Any]] = field(default_factory=list)
 
