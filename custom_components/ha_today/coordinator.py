@@ -115,9 +115,34 @@ class StoryCoordinator(DataUpdateCoordinator):
             {"timestamp": row["timestamp"], "content": row["content"]}
             for row in rows
         ]
-        self.data.recent_story = " ".join(entry["content"] for entry in self.data.story_entries)
+        self.data.recent_story = self._format_story_with_days(self.data.story_entries)
 
         _LOGGER.info("Loaded %d story entries from last %dh", len(self.data.story_entries), HISTORY_HOURS)
+
+    def _format_story_with_days(self, entries: list[dict[str, Any]]) -> str:
+        """Format story entries with newlines and day headings."""
+        if not entries:
+            return ""
+
+        lines = []
+        current_date = None
+
+        for entry in entries:
+            # Parse the timestamp
+            ts = datetime.fromisoformat(entry["timestamp"])
+            entry_date = ts.date()
+
+            # Add day heading if date changed
+            if entry_date != current_date:
+                if current_date is not None:
+                    lines.append("")  # Blank line before new day
+                lines.append(f"## {entry_date.strftime('%A, %B %d')}")
+                lines.append("")
+                current_date = entry_date
+
+            lines.append(entry["content"])
+
+        return "\n".join(lines)
 
     async def manual_generate(self) -> None:
         """Manually trigger story generation."""
@@ -186,8 +211,10 @@ class StoryCoordinator(DataUpdateCoordinator):
             base_prompt = self.entry.data.get(CONF_BASE_PROMPT, DEFAULT_BASE_PROMPT)
             formatted_prompt = self._build_prompt(base_prompt)
 
-            _LOGGER.info("Generating with %d events", len(self.data.pending_events))
-            _LOGGER.debug("=== PROMPT ===\n%s\n=== END ===", formatted_prompt)
+            _LOGGER.info("Generating with %d events:", len(self.data.pending_events))
+            for evt in self.data.pending_events:
+                _LOGGER.info("  - %s: %s", evt["timestamp"].strftime("%H:%M:%S"), evt["event"])
+            _LOGGER.info("=== PROMPT ===\n%s\n=== END PROMPT ===", formatted_prompt)
 
             # Call AI task service
             response = await self.hass.services.async_call(
@@ -201,7 +228,7 @@ class StoryCoordinator(DataUpdateCoordinator):
                 return_response=True,
             )
 
-            _LOGGER.debug("AI response: %s", response)
+            _LOGGER.info("=== AI RESPONSE ===\n%s\n=== END RESPONSE ===", response)
 
             # Extract segment from response
             segment = None
@@ -235,7 +262,7 @@ class StoryCoordinator(DataUpdateCoordinator):
 
             # Update local state
             self.data.story_entries.append({"timestamp": timestamp, "content": segment})
-            self.data.recent_story = " ".join(entry["content"] for entry in self.data.story_entries)
+            self.data.recent_story = self._format_story_with_days(self.data.story_entries)
 
             # Clear pending events
             self.data.pending_events.clear()

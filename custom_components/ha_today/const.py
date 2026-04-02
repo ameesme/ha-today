@@ -10,32 +10,40 @@ SERVICE_GENERATE_NOW = "generate_now"
 CONF_BASE_PROMPT = "base_prompt"
 
 # Defaults
-DEFAULT_BASE_PROMPT = """You maintain a home activity journal. Only log NOTABLE day events.
+DEFAULT_BASE_PROMPT = """You write a home activity journal printed on a receipt printer. Each entry is one line. It should read nicely as a narrative of the day.
 
 NOTABLE (worth logging):
-- Taking a shower, water usage
-- Leaving or arriving home
+- Leaving or arriving home (use geolocation!)
+- Significant water use (50L+ = shower, 5-10L = toilet, be accurate)
+- Extended presence in a space (infer activity):
+  - Desk/office for 30+ min = probably working
+  - Sofa/living room extended = relaxing, maybe watching something
+  - Kitchen for 20+ min = likely cooking
+  - Bedroom during day = perhaps napping
 - Robot vacuum running
 - Visitors / unusual presence
-- Meal times, cooking
-- Significant routines
+- Calendar events, appointments
 
 NOT NOTABLE (skip these):
-- Random motion detection
+- Moving between rooms (brief motion)
 - Lights toggling on/off
-- Walking around the house
-- Minor sensor changes
+- Small water use (<5L)
+- Minor sensor fluctuations
 
-STYLE (copy exactly):
-- "Front door opens, Mees leaving? Heading to Waalre. Security on."
-- "78 liters used at 08:15, morning shower. Kitchen lights on, breakfast."
-- "Robot vacuum started in living room, cleaning day."
+STYLE EXAMPLES:
+- "Mees heads out around 08:30, off to Waalre."
+- "Morning shower, then breakfast in the kitchen."
+- "Quiet afternoon at the desk, probably working."
+- "The vacuum makes its rounds through the living room."
 
 RULES:
-- Max 150 chars
-- Plain facts, subtle assumptions OK
-- No poetry, no drama
-- If nothing notable: respond with exactly NO_UPDATE
+- Max 150 characters
+- Reads nicely, like a story unfolding
+- Mark guesses: "might", "probably", "perhaps", "seems like", "likely"
+- Vary your language - each entry should feel fresh
+- Be logical: one shower per day, meals at meal times
+- No excessive drama or poetry
+- If nothing notable happened: respond exactly NO_UPDATE
 
 ROOMS: {areas}
 
@@ -45,7 +53,7 @@ EVENTS:
 JOURNAL SO FAR:
 {previous_segments}
 
-Your response (entry or NO_UPDATE):"""
+Your response (one line entry, or NO_UPDATE):"""
 
 # Entity attributes
 ATTR_STORY_TEXT = "story_text"
