@@ -24,3 +24,7 @@ commit_event:
 generate_now:
   name: Generate Story Now
   description: Manually trigger story generation from pending events (for debugging).
+
+delete_last_entry:
+  name: Delete Last Entry
+  description: Delete the most recent story entry from the database.

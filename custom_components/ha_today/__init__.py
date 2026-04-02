@@ -10,7 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 
-from .const import DOMAIN, SERVICE_COMMIT_EVENT, SERVICE_GENERATE_NOW
+from .const import DOMAIN, SERVICE_COMMIT_EVENT, SERVICE_GENERATE_NOW, SERVICE_DELETE_LAST
 from .coordinator import StoryCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +74,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         _LOGGER.info("Registered %s.%s service", DOMAIN, SERVICE_GENERATE_NOW)
 
+    # Register delete last entry service
+    if not hass.services.has_service(DOMAIN, SERVICE_DELETE_LAST):
+
+        async def handle_delete_last(call: ServiceCall) -> None:
+            """Handle the delete_last_entry service call."""
+            for coordinator_entry_id, coord in hass.data[DOMAIN].items():
+                if isinstance(coord, StoryCoordinator):
+                    await coord.delete_last_entry()
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DELETE_LAST,
+            handle_delete_last,
+        )
+
+        _LOGGER.info("Registered %s.%s service", DOMAIN, SERVICE_DELETE_LAST)
+
     # Forward setup to sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -97,6 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_COMMIT_EVENT)
             hass.services.async_remove(DOMAIN, SERVICE_GENERATE_NOW)
+            hass.services.async_remove(DOMAIN, SERVICE_DELETE_LAST)
             _LOGGER.info("Removed services")
 
     return unload_ok

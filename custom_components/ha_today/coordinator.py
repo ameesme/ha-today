@@ -161,6 +161,33 @@ class StoryCoordinator(DataUpdateCoordinator):
         _LOGGER.info("=== Manual generation triggered ===")
         await self._generate_segment()
 
+    async def delete_last_entry(self) -> None:
+        """Delete the most recent story entry."""
+        if not self.data.story_entries:
+            _LOGGER.warning("No entries to delete")
+            return
+
+        # Get the last entry
+        last_entry = self.data.story_entries[-1]
+        timestamp = last_entry["timestamp"]
+
+        # Delete from database
+        async with aiosqlite.connect(self._db_path) as db:
+            await db.execute(
+                "DELETE FROM story_entries WHERE timestamp = ?",
+                (timestamp,)
+            )
+            await db.commit()
+
+        # Remove from local state
+        self.data.story_entries.pop()
+        self.data.recent_story = self._format_story_with_days(self.data.story_entries)
+
+        _LOGGER.info("Deleted entry from %s", timestamp)
+
+        # Notify listeners
+        self.async_set_updated_data(self.data)
+
     async def add_event(self, event_data: dict[str, Any]) -> None:
         """Add an event to the pending buffer."""
         event = {
@@ -256,7 +283,9 @@ class StoryCoordinator(DataUpdateCoordinator):
             self.data.last_generation_time = dt_util.now()
 
             # Check for NO_UPDATE response - keep events for next time
-            if not segment or segment.upper() in ("NO_UPDATE", "NO UPDATE", "NONE", "N/A"):
+            # LLM might add explanation after NO_UPDATE, so check if it starts with it
+            segment_check = segment.upper().split('\n')[0].strip() if segment else ""
+            if not segment or segment_check in ("NO_UPDATE", "NO UPDATE", "NONE", "N/A") or segment_check.startswith("NO_UPDATE") or segment_check.startswith("NO UPDATE"):
                 _LOGGER.info("LLM decided: no noteworthy events yet - keeping %d events for next check", len(self.data.pending_events))
 
                 # Add a synthetic event so LLM knows how long since last generation

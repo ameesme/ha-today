@@ -5,6 +5,7 @@ DOMAIN = "ha_today"
 # Services
 SERVICE_COMMIT_EVENT = "commit_event"
 SERVICE_GENERATE_NOW = "generate_now"
+SERVICE_DELETE_LAST = "delete_last_entry"
 
 # Config keys
 CONF_BASE_PROMPT = "base_prompt"
@@ -19,7 +20,6 @@ NOTABLE (worth logging):
   - Desk/office for 30+ min = probably working
   - Sofa/living room extended = relaxing, maybe watching something
   - Kitchen for 20+ min = likely cooking
-  - Bedroom during day = perhaps napping
 - Robot vacuum running
 - Visitors / unusual presence
 - Calendar events, appointments
@@ -29,6 +29,7 @@ NOT NOTABLE (skip these):
 - Lights toggling on/off
 - Small water use (<5L)
 - Minor sensor fluctuations
+- Note: presence sensors can be flaky—brief on/off toggles or gaps don't mean someone left/returned
 
 STYLE EXAMPLES:
 - "Mees heads out around 08:30, off to Waalre."
@@ -43,7 +44,7 @@ RULES:
 - Vary your language - each entry should feel fresh
 - Be logical: one shower per day, meals at meal times
 - No excessive drama or poetry
-- If nothing notable happened: respond exactly NO_UPDATE
+- If nothing notable happened: respond ONLY with NO_UPDATE (no explanation, just those two words)
 - Events marked [System: No story segment generated...] show previous skips.
   If many skips accumulated, infer an extended activity based on context:
   - Night (23:00-07:00) + quiet = sleeping

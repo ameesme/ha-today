@@ -43,6 +43,10 @@
     "generate_now": {
       "name": "Generate Now",
       "description": "Manually trigger generation from pending events."
+    },
+    "delete_last_entry": {
+      "name": "Delete Last Entry",
+      "description": "Delete the most recent story entry from the database."
     }
   }
 }
