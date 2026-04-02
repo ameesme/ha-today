@@ -143,8 +143,12 @@ class StoryCoordinator(DataUpdateCoordinator):
 
             current_date = entry_date
 
-            # Add entry with bold timestamp
-            lines.append(f"**{time_str}** {entry['content']}")
+            # Add entry - no timestamp if it starts with --- (horizontal rule segment)
+            content = entry['content']
+            if content.startswith("---"):
+                lines.append(content)
+            else:
+                lines.append(f"**{time_str}** {content}")
 
         # Add heading for the oldest day at the bottom
         if current_date is not None:

@@ -51,7 +51,11 @@ RULES:
   - At desk + quiet = deep work session
   - Daytime bedroom + quiet = napping
   - Headed out for exercise = still running/cycling
-  Log these: "A quiet night's sleep." or "Still out and about."
+- For long time gaps, use horizontal rules (use sparingly):
+  ---
+  Nothing happened between 23:48 and 08:00, Mees was probably sleeping.
+  ---
+  Start your response with --- to trigger this format (no timestamp will be added).
 
 ROOMS: {areas}
 
