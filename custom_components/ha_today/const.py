@@ -44,6 +44,14 @@ RULES:
 - Be logical: one shower per day, meals at meal times
 - No excessive drama or poetry
 - If nothing notable happened: respond exactly NO_UPDATE
+- Events marked [System: No story segment generated...] show previous skips.
+  If many skips accumulated, infer an extended activity based on context:
+  - Night (23:00-07:00) + quiet = sleeping
+  - Left home + still quiet = still out
+  - At desk + quiet = deep work session
+  - Daytime bedroom + quiet = napping
+  - Headed out for exercise = still running/cycling
+  Log these: "A quiet night's sleep." or "Still out and about."
 
 ROOMS: {areas}
 

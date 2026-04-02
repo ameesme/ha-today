@@ -120,27 +120,35 @@ class StoryCoordinator(DataUpdateCoordinator):
         _LOGGER.info("Loaded %d story entries from last %dh", len(self.data.story_entries), HISTORY_HOURS)
 
     def _format_story_with_days(self, entries: list[dict[str, Any]]) -> str:
-        """Format story entries with newlines and day headings."""
+        """Format story entries with newlines and day headings (reverse order, newest first)."""
         if not entries:
             return ""
+
+        # Reverse entries - most recent first
+        reversed_entries = list(reversed(entries))
 
         lines = []
         current_date = None
 
-        for entry in entries:
+        for entry in reversed_entries:
             # Parse the timestamp
             ts = datetime.fromisoformat(entry["timestamp"])
             entry_date = ts.date()
+            time_str = ts.strftime("%H:%M")
 
-            # Add day heading if date changed
-            if entry_date != current_date:
-                if current_date is not None:
-                    lines.append("")  # Blank line before new day
-                lines.append(f"## {entry_date.strftime('%A, %B %d')}")
+            # If we moved to a different (older) day, add heading for the day we just finished
+            if current_date is not None and entry_date != current_date:
+                lines.append(f"## {current_date.strftime('%A, %B %d')}")
                 lines.append("")
-                current_date = entry_date
 
-            lines.append(entry["content"])
+            current_date = entry_date
+
+            # Add entry with bold timestamp
+            lines.append(f"**{time_str}** {entry['content']}")
+
+        # Add heading for the oldest day at the bottom
+        if current_date is not None:
+            lines.append(f"## {current_date.strftime('%A, %B %d')}")
 
         return "\n".join(lines)
 
@@ -246,6 +254,16 @@ class StoryCoordinator(DataUpdateCoordinator):
             # Check for NO_UPDATE response - keep events for next time
             if not segment or segment.upper() in ("NO_UPDATE", "NO UPDATE", "NONE", "N/A"):
                 _LOGGER.info("LLM decided: no noteworthy events yet - keeping %d events for next check", len(self.data.pending_events))
+
+                # Add a synthetic event so LLM knows how long since last generation
+                skip_event = {
+                    "timestamp": dt_util.now(),
+                    "event": "[System: No story segment generated at this check]",
+                    "entity_id": None,
+                    "metadata": {"type": "system_skip"},
+                }
+                self.data.pending_events.append(skip_event)
+
                 self.async_set_updated_data(self.data)
                 return
 
